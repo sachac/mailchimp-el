@@ -1,0 +1,7 @@
+mailchimp.el
+
+Not an official Mailchimp library, just the
+starting point for some functions for working with
+the API.
+
+Contact: [[mailto:sacha@sachachua.com][sacha@sachachua.com]]
