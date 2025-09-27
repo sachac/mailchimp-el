@@ -52,14 +52,18 @@ Return a JSON object."
 
   (let* ((server-prefix (mailchimp-server-prefix))
          (api-key-only (nth 0 (split-string mailchimp-api-key "-")))
-         (url (format "https://%s.api.mailchimp.com/3.0/%s" server-prefix path))
+         (url (if (string-match "^https:" path)
+									path (format "https://%s.api.mailchimp.com/3.0/%s" server-prefix path)))
          (auth-header (concat "anystring:" mailchimp-api-key))
          (url-request-extra-headers
 					`(("Authorization" .
 						 ,(concat "Basic "
 											(base64-encode-string auth-header)))
 						("Content-Type" . "application/json")))
-         (url-request-data body)
+         (url-request-data (cond
+														((stringp body) body)
+														((null body) body)
+														(t (encode-coding-string (json-encode body) 'utf-8))))
          (url-request-method method))
     (with-current-buffer (url-retrieve-synchronously
 													url)
@@ -84,14 +88,24 @@ The file content is base64-encoded and sent in the request body."
 																 :body body)))))
 
 ;;;###autoload
-(defun mailchimp-get-recent-files (&optional n offset)
+(defun mailchimp-recent-files (&optional n offset)
   "Get a list of recently uploaded files from Mailchimp.
-N is an optional number to limit the count of recent files returned.
-OFFSET is the starting offset.
-If N is nil, returns up to 100 files."
+N is an optional number to limit the count of recent files returned (default: 100).
+OFFSET is the starting offset."
 	(setq n (or n 100))
 	(setq offset (or offset 0))
 	(mailchimp--request-json
 	 (format "file-manager/files?count=%d&sort_field=added_date&sort_dir=DESC&offset=%d" n offset)))
+
+(defun mailchimp-campaigns (&optional n offset)
+	"Get a list of recent campaigns from Mailchimp.
+N is an optional number to limit the count of recent files returned (default: 10).
+OFFSET is the starting offset."
+	(setq n (or n 10))
+	(setq offset (or offset 0))
+	(mailchimp--request-json
+	 (format "campaigns?count=%d&sort_field=create_time&sort_dir=DESC&offset=%d" n offset)))
+
+(provide 'mailchimp)
 
 ;;; mailchimp.el ends here
