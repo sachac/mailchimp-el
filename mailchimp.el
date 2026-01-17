@@ -111,7 +111,7 @@ OFFSET is the starting offset."
   (mailchimp--request-json
 	 (format "campaigns/%s/content" campaign-id)))
 
-(defun mailchimp-campaign-update-section (campaign-id template-id &optional sections)
+(defun mailchimp-campaign-update-from-template (campaign-id template-id &optional sections)
   "SECTIONS should be an alist of (section-id . html)"
   (mailchimp--request-json
 	 (format "campaigns/%s/content" campaign-id)
