@@ -68,7 +68,8 @@ Return a JSON object."
     (with-current-buffer (url-retrieve-synchronously
 													url)
 			(goto-char url-http-end-of-headers)
-			(json-read))))
+      (unless (looking-at "\n\\'")
+        (json-read)))))
 
 ;;;###autoload
 (defun mailchimp-upload-file (filename)
@@ -105,6 +106,74 @@ OFFSET is the starting offset."
 	(setq offset (or offset 0))
 	(mailchimp--request-json
 	 (format "campaigns?count=%d&sort_field=create_time&sort_dir=DESC&offset=%d" n offset)))
+
+(defun mailchimp-campaign-content (campaign-id)
+  (mailchimp--request-json
+	 (format "campaigns/%s/content" campaign-id)))
+
+(defun mailchimp-campaign-update-section (campaign-id template-id &optional sections)
+  "SECTIONS should be an alist of (section-id . html)"
+  (mailchimp--request-json
+	 (format "campaigns/%s/content" campaign-id)
+   :method  "PUT"
+   :body
+   (list
+    (cons "template"
+          (list
+           (cons "id" template-id)
+           (cons "sections" sections))))))
+
+(defun mailchimp-complete-campaign ()
+  (let* ((campaigns
+          (mapcar
+           (lambda (o)
+             (cons
+              (alist-get 'title (alist-get 'settings o))
+              o))
+           (alist-get 'campaigns (mailchimp-campaigns))))
+         (name (completing-read "Campaign: "
+                                (lambda (string pred action)
+                                  (if (eq action 'metadata)
+                                      `(metadata (display-sort-function . ,#'identity))
+                                    (complete-with-action action campaigns string pred)))
+                                nil t nil)))
+    (assoc-default name campaigns 'string=)))
+
+(defun mailchimp-templates ()
+  (mailchimp--request-json
+	 (format "templates?sort_field=date_created&sort_dir=DESC")))
+
+;;;###autoload
+(defun mailchimp-campaign-send-test-email (campaign-id emails &optional type)
+  (interactive
+   (list
+    (mailchimp-complete-campaign)
+    (read-string "Emails (;-separated): ")
+    "html"))
+  (when (listp campaign-id) (setq campaign-id (alist-get 'id campaign-id)))
+  (when (stringp emails) (setq emails (split-string emails " *; *")))
+  (setq type (or type "html"))
+  (mailchimp--request-json
+   (format "campaigns/%s/actions/test" campaign-id)
+   :method  "POST"
+   :body
+   (list
+    (cons "test_emails" emails)
+    (cons "send_type" type))))
+
+;;;###autoload
+(defun mailchimp-campaign-schedule (campaign-id schedule-time)
+  (interactive (list (mailchimp-complete-campaign)
+                     (if (fboundp 'org-read-date)
+                         (org-read-date t t nil "Send time: "))))
+  (when (listp campaign-id) (setq campaign-id (alist-get 'id campaign-id)))
+  (unless (stringp schedule-time)
+    (setq schedule-time (format-time-string "%FT%T%z" schedule-time t)))
+  (mailchimp--request-json
+   (format "campaigns/%s/actions/schedule" campaign-id)
+   :method  "POST"
+   :body
+   (list (cons "schedule_time" schedule-time))))
 
 (provide 'mailchimp)
 
